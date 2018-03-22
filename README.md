@@ -1,0 +1,2 @@
+# Etsy Searched Terms Scraper
+
