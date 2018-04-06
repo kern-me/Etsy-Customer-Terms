@@ -124,9 +124,10 @@ end findColumnStat
 
 on getData()
 	writeFile(rowHeaders & newLine, false) as text
-	set theCount to 0
-	set keyword to ""
 	repeat
+		set theCount to 0
+		set keyword to ""
+		
 		repeat
 			set updatedCount to (theCount + 1)
 			log "updatedCount = " & updatedCount & ""
@@ -152,8 +153,6 @@ on getData()
 			
 			writeFile(keyword & "," & col2 & "," & col3 & "," & col4 & newLine, false) as text
 		end repeat
-		
-		log "Reset the counter"
 		
 		log "Check to see if the button is disabled."
 		
