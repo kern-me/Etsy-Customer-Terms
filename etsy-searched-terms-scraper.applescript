@@ -76,12 +76,11 @@ on writeFile(theContent, writable)
 end writeFile
 
 
-
 -- Get the Keyword from the DOM
 on selectKeyword(theSelector, theInstance, theSecondInstance)
 	tell application "Safari"
 		try
-			set keyword to do JavaScript "document.querySelectorAll('" & theSelector & "')[" & theInstance & "].getElementsByTagName('span')[" & theSecondInstance & "].innerText; " in document 1
+			set keyword to do JavaScript "document.querySelectorAll('" & theSelector & "')[" & theInstance & "].getElementsByTagName('span')[" & theSecondInstance & "].stripChar(')innerText; " as string in document 1
 			return keyword
 		on error
 			return false
@@ -117,7 +116,7 @@ on findColumnStat(firstInstance, secondInstance)
 		
 		set theResult to do JavaScript "" & doJS & "" in document 1
 		
-		return theResult as text
+		return theResult
 	end tell
 end findColumnStat
 
@@ -143,12 +142,10 @@ on getData()
 			end if
 			
 			set col2 to findColumnStat(updatedCount + 1, 1) as text
-			
 			set col3 to findColumnStat(updatedCount + 1, 2) as text
-			
 			set col4 to findColumnStat(updatedCount + 1, 3) as text
-			
 			set theCount to theCount + 1
+			
 			log "Updating theCount to " & theCount & " "
 			
 			writeFile(keyword & "," & col2 & "," & col3 & "," & col4 & newLine, false) as text
