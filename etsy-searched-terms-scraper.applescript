@@ -3,15 +3,13 @@
 -- ========================================
 set AppleScript's text item delimiters to ","
 
-property defaultKeyDelay : 0.2
 property defaultDelayValue : 0.75
 
-property rowHeaders : "Search Terms, Etsy, Google \",\" ETC, Total Visits"
+property rowHeaders : "Search Terms, Etsy, Google, Total Visits"
 
-property newLine : "
-"
+property newLine : "\n"
 
-property jsFindNavButton : "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:last-child')[0].click()"
+
 
 property jsNextButtonDisabled : "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:last-child')[0].disabled"
 
@@ -23,22 +21,13 @@ property rowSelector : "#horizontal-chart3 > div > div"
 # For the keywords
 property selectorPath : "#horizontal-chart3 > div"
 
--- Log Dividers
-on logIt(content)
-	log "------------------------------------------------"
-	log content
-	log "------------------------------------------------"
-end logIt
-
 
 on userPrompt(theText)
-	logIt("userPrompt()")
 	activate
 	display dialog theText
 end userPrompt
 
 on userPrompt2Buttons(theText, buttonText1, buttonText2)
-	logIt("userPrompt()")
 	activate
 	display dialog theText buttons {buttonText1, buttonText2}
 end userPrompt2Buttons
@@ -46,9 +35,7 @@ end userPrompt2Buttons
 
 -- Reading and Writing Params
 on writeTextToFile(theText, theFile, overwriteExistingContent)
-	logIt("writeTextToFile()")
 	try
-		
 		set theFile to theFile as string
 		set theOpenedFile to open for access file theFile with write permission
 		
@@ -69,24 +56,10 @@ end writeTextToFile
 
 -- Write to file
 on writeFile(theContent, writable)
-	logIt("writeFile()")
 	set this_Story to theContent
 	set theFile to (((path to desktop folder) as string) & "Etsy Searched Terms.csv")
 	writeTextToFile(this_Story, theFile, writable)
 end writeFile
-
-
--- Get the Keyword from the DOM
-on selectKeyword(theSelector, theInstance, theSecondInstance)
-	tell application "Safari"
-		try
-			set keyword to do JavaScript "document.querySelectorAll('" & theSelector & "')[" & theInstance & "].getElementsByTagName('span')[" & theSecondInstance & "].stripChar(')innerText; " as string in document 1
-			return keyword
-		on error
-			return false
-		end try
-	end tell
-end selectKeyword
 
 
 -- Progress Dialog Handler
@@ -103,68 +76,134 @@ on findNode(theJS)
 end findNode
 
 
--- Main Routine
-log "Clicking the '1' Button to ensure we're on the first page of results."
-findNode(jsFindNavButtonHome)
-
-on findColumnStat(firstInstance, secondInstance)
+-- Get the keyword
+on getKeyword(instance)
 	tell application "Safari"
-		
-		set theSelector to "#horizontal-chart3 > div:nth-child(" & firstInstance & ") > div.col-group.pl-xs-2.pl-md-1.pr-xs-2.pr-md-1.pl-lg-0.pr-lg-0.pt-xs-2 > div.col-xs-8.text-gray-lighter.text-right.pr-md-0 > div:nth-child(" & secondInstance & ")"
-		
-		set doJS to "document.querySelectorAll('" & theSelector & "')[0].innerText"
-		
-		set theResult to do JavaScript "" & doJS & "" in document 1
-		
-		return theResult
+		try
+			set a to do JavaScript "document.querySelectorAll(\"#horizontal-chart3 span[data-test-id='unsanitize']\")[" & instance & "].innerText" in document 1
+			return a
+		on error
+			return false
+		end try
 	end tell
-end findColumnStat
+end getKeyword
 
+-- Get the number of Etsy visits
+on getEtsyVisits(instance)
+	tell application "Safari"
+		set a to do JavaScript "document.querySelectorAll(\"#horizontal-chart3 > tr:nth-child(" & instance & ") > td > div > div.col-group.pl-xs-2.pl-md-1.pr-xs-2.pr-md-1.pl-lg-0.pr-lg-0.pt-xs-2 > div.col-xs-8.text-gray-lighter.text-right.pr-md-0 > div\")[0].innerText" in document 1
+		return a
+	end tell
+end getEtsyVisits
+
+-- Get "Google, etc" data
+on getGoogleData(instance)
+	tell application "Safari"
+		set a to do JavaScript "document.querySelectorAll(\"#horizontal-chart3 > tr:nth-child(" & instance & ") > td > div > div.col-group.pl-xs-2.pl-md-1.pr-xs-2.pr-md-1.pl-lg-0.pr-lg-0.pt-xs-2 > div.col-xs-8.text-gray-lighter.text-right.pr-md-0 > div\")[1].innerText" in document 1
+		return a
+	end tell
+end getGoogleData
+
+-- Get Total Visits
+on getTotalVisits(instance)
+	tell application "Safari"
+		set a to do JavaScript "document.querySelectorAll(\"#horizontal-chart3 > tr:nth-child(" & instance & ") > td > div > div.col-group.pl-xs-2.pl-md-1.pr-xs-2.pr-md-1.pl-lg-0.pr-lg-0.pt-xs-2 > div.col-xs-8.text-gray-lighter.text-right.pr-md-0 > div\")[2].innerText" in document 1
+		return a
+	end tell
+end getTotalVisits
+
+################################
+# CONSTRUCTOR HANDLERS
+################################
+
+# Initialize - click the 1 button
+on initialize()
+	#log "Clicking the '1' Button to ensure we're on the first page of results."
+	set a to "document.querySelectorAll('.pagination .btn')[1].click()"
+	findNode(a)
+end initialize
+
+# Check "next" button
+on checkPaginationButton()
+	tell application "Safari"
+		set a to do JavaScript "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:last-child')[0].disabled" in document 1
+		
+		return a
+	end tell
+end checkPaginationButton
+
+# Click Pagination Next Button
+on paginationNext()
+	# Clicking the '1' Button to ensure we're on the first page of results."
+	set a to "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:last-child')[0].click()"
+	
+	findNode(a)
+end paginationNext
+
+
+#################################
+# MAIN ROUTINE #
+#################################
 
 on getData()
-	writeFile(rowHeaders & newLine, false) as text
+	writeFile(rowHeaders & newLine, false) as string
+	
+	initialize()
+	
 	repeat
-		set theCount to 0
+		set theCount to -1
 		set keyword to ""
 		
 		repeat
 			set updatedCount to (theCount + 1)
-			log "updatedCount = " & updatedCount & ""
-			
 			delay defaultDelayValue
 			
-			set keyword to selectKeyword(selectorPath, updatedCount, 0)
-			log "the keyword: " & keyword & ""
+			# Get the Keyword Term
+			set keyword to getKeyword(updatedCount)
 			
+			# End the loop when the keyword query comes back as false
 			if keyword is false then
-				log "keyword is false. exiting the loop."
+				#log "End of the loop. Exiting this loop."
 				exit repeat
 			end if
 			
-			set col2 to findColumnStat(updatedCount + 1, 1) as text
-			set col3 to findColumnStat(updatedCount + 1, 2) as text
-			set col4 to findColumnStat(updatedCount + 1, 3) as text
+			# Set keyword to string
+			set keyword to keyword as string
+			
+			# Find the Etsy Visits data
+			set etsyVisits to getEtsyVisits(updatedCount + 2)
+			set etsyVisits to etsyVisits as string
+			
+			# Find the Google, Etc data
+			set googleData to getGoogleData(updatedCount + 2)
+			set googleData to googleData
+			
+			# Find the Total Visits
+			set totalVisits to getTotalVisits(updatedCount + 2)
+			set totalVisits to totalVisits as string
+			
+			# Update the counter
 			set theCount to theCount + 1
 			
-			log "Updating theCount to " & theCount & " "
-			
-			writeFile(keyword & "," & col2 & "," & col3 & "," & col4 & newLine, false) as text
+			# Write to file
+			writeFile(keyword & "," & etsyVisits & "," & googleData & "," & totalVisits & newLine, false) as string
 		end repeat
 		
-		log "Check to see if the button is disabled."
-		
-		if findNode(jsNextButtonDisabled) is true then
-			log "Next button is disabled. Exiting repeat loop."
+		# Check to see if the button is disabled
+		if checkPaginationButton() is false then
+			paginationNext()
+		else
+			# Next button is disabled. Exiting repeat loop.
 			exit repeat
 		end if
 		
-		log "Clicking the 'Next' Pagination button..."
-		findNode(jsFindNavButton)
-		
-		log "Waiting for the new keywords to load..."
+		# Waiting for the new keywords to load...
 		delay defaultDelayValue
 	end repeat
 	userPrompt("Finished!")
 end getData
 
+--
+
 getData()
+
