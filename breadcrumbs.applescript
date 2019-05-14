@@ -16,6 +16,8 @@ property jsNextButtonDisabled : "document.querySelectorAll('.pagination')[0].que
 
 property jsFindNavButtonHome : "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item')[1].click()"
 
+property mainURL : "https://www.etsy.com/your/shops/me/stats/traffic?ref=seller-platform-mcnav"
+
 -- Log Dividers
 on logIt(content)
 	log "------------------------------------------------"
@@ -44,6 +46,42 @@ end userPrompt2Buttons
 on progressDialog(theMessage)
 	set progress description to theMessage
 end progressDialog
+
+-- User Range Choice Dialog
+on chooseRange()
+	# URL append options
+	set last30 to "&date_range=last_30"
+	set thisYear to "&date_range=this_year"
+	set allTime to "&date_range=all_time"
+	
+	# Button Displays
+	set a to "Last 30 Days (Recommended)"
+	set b to "This Year"
+	set c to "All Time"
+	
+	# Dialog Window
+	set userDialog to display dialog "Which range do you want to display?" buttons {a, b, c} default button 1
+	
+	# Return the user's choice
+	set userChoice to button returned of userDialog as string
+	
+	if userChoice is a then
+		set theData to last30
+	else if userChoice is b then
+		set theData to thisYear
+	else if userChoice is c then
+		set theData to allTime
+	end if
+	
+	return theData
+end chooseRange
+
+-- Set url append
+on setUserRange()
+	set theURL to chooseRange()
+	return theURL as string
+end setUserRange
+
 
 
 -- ========================================
@@ -79,6 +117,17 @@ on writeFile(theContent, writable)
 	set theFile to (((path to desktop folder) as string) & "Etsy Searched Terms.csv")
 	writeTextToFile(this_Story, theFile, writable)
 end writeFile
+
+-- ========================================
+-- BROWSER / URL BEHAVIOR
+-- ========================================
+on openURL(a)
+	tell application "Safari"
+		tell window 1
+			set current tab to (make new tab with properties {URL:mainURL & a})
+		end tell
+	end tell
+end openURL
 
 
 -- ========================================
@@ -156,7 +205,6 @@ on getData()
 		log "Updating theCount to " & theCount & " "
 		
 		writeFile(keyword & "," & col2 & "," & col3 & "," & col4 & newLine, false) as text
-		#writeFile(keyword & newLine, false) as text
 	end repeat
 end getData
 
@@ -200,6 +248,9 @@ end firstButton
 -- ========================================
 
 on mainRoutine()
+	set urlAppend to setUserRange()
+	openURL(urlAppend)
+	delay 10
 	writeHeaders()
 	firstButton()
 	
@@ -215,4 +266,4 @@ on mainRoutine()
 end mainRoutine
 
 mainRoutine()
-#col(2, 1)
+
