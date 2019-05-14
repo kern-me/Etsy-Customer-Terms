@@ -1,5 +1,5 @@
 -- ========================================
--- Properties
+-- PROPERTIES
 -- ========================================
 set AppleScript's text item delimiters to ","
 
@@ -8,20 +8,13 @@ property defaultDelayValue : 0.75
 
 property rowHeaders : "Search Terms, Etsy, Google \",\" ETC, Total Visits"
 
-property newLine : "
-"
+property newLine : "\n"
 
 property jsFindNavButton : "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:last-child')[0].click()"
 
 property jsNextButtonDisabled : "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:last-child')[0].disabled"
 
 property jsFindNavButtonHome : "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item')[1].click()"
-
-# For the pagination button
-property rowSelector : "#horizontal-chart3 > div > div"
-
-# For the keywords
-property selectorPath : "#horizontal-chart3 > div"
 
 -- Log Dividers
 on logIt(content)
@@ -30,6 +23,10 @@ on logIt(content)
 	log "------------------------------------------------"
 end logIt
 
+
+-- ========================================
+-- USER PROMPTS
+-- ========================================
 
 on userPrompt(theText)
 	logIt("userPrompt()")
@@ -43,8 +40,16 @@ on userPrompt2Buttons(theText, buttonText1, buttonText2)
 	display dialog theText buttons {buttonText1, buttonText2}
 end userPrompt2Buttons
 
+-- Progress Dialog Handler
+on progressDialog(theMessage)
+	set progress description to theMessage
+end progressDialog
 
--- Reading and Writing Params
+
+-- ========================================
+-- READ AND WRITE
+-- ========================================
+
 on writeTextToFile(theText, theFile, overwriteExistingContent)
 	logIt("writeTextToFile()")
 	try
@@ -76,25 +81,37 @@ on writeFile(theContent, writable)
 end writeFile
 
 
+-- ========================================
+-- DOM INTERACTIONS
+-- ========================================
 
--- Get the Keyword from the DOM
-on selectKeyword(theSelector, theInstance, theSecondInstance)
-	tell application "Safari"
-		try
-			set keyword to do JavaScript "document.querySelectorAll('" & theSelector & "')[" & theInstance & "].getElementsByTagName('span')[" & theSecondInstance & "].innerText; " in document 1
-			return keyword
-		on error
-			return false
-		end try
-	end tell
-end selectKeyword
+-- Find keyword term
+on keywordTerm(a)
+	try
+		tell application "Safari"
+			set theKeyword to do JavaScript "document.querySelector('#horizontal-chart3 tr:nth-child(" & a & ") span').innerText" in document 1
+			return theKeyword as text
+		end tell
+	on error
+		return false
+	end try
+end keywordTerm
 
+-- Find column data
+on col(a, b)
+	try
+		tell application "Safari"
+			set theData to do JavaScript "document.querySelector('#horizontal-chart3 > tr:nth-child(" & a & ") > td > div > div > div > div:nth-child(" & b & ")').innerText" in document 1
+			return theData as text
+		end tell
+	on error
+		return false
+	end try
+end col
 
--- Progress Dialog Handler
-on progressDialog(theMessage)
-	set progress description to theMessage
-end progressDialog
-
+-- ========================================
+-- USER PROMPTS
+-- ========================================
 
 -- Pagination Button
 on findNode(theJS)
@@ -104,70 +121,98 @@ on findNode(theJS)
 end findNode
 
 
--- Main Routine
-log "Clicking the '1' Button to ensure we're on the first page of results."
-findNode(jsFindNavButtonHome)
+-- ========================================
+-- WRITE HEADERS
+-- ========================================
 
-on findColumnStat(firstInstance, secondInstance)
-	tell application "Safari"
-		
-		set theSelector to "#horizontal-chart3 > div:nth-child(" & firstInstance & ") > div.col-group.pl-xs-2.pl-md-1.pr-xs-2.pr-md-1.pl-lg-0.pr-lg-0.pt-xs-2 > div.col-xs-8.text-gray-lighter.text-right.pr-md-0 > div:nth-child(" & secondInstance & ")"
-		
-		set doJS to "document.querySelectorAll('" & theSelector & "')[0].innerText"
-		
-		set theResult to do JavaScript "" & doJS & "" in document 1
-		
-		return theResult as text
-	end tell
-end findColumnStat
-
-
-on getData()
+-- Write Headers
+on writeHeaders()
 	writeFile(rowHeaders & newLine, false) as text
+end writeHeaders
+
+-- Write the Data
+on getData()
+	set theCount to 2
+	set keyword to ""
+	
 	repeat
-		set theCount to 0
-		set keyword to ""
+		set updatedCount to (theCount + 1)
+		log "updatedCount = " & updatedCount & ""
 		
-		repeat
-			set updatedCount to (theCount + 1)
-			log "updatedCount = " & updatedCount & ""
-			
-			delay defaultDelayValue
-			
-			set keyword to selectKeyword(selectorPath, updatedCount, 0)
-			log "the keyword: " & keyword & ""
-			
-			if keyword is false then
-				log "keyword is false. exiting the loop."
-				exit repeat
-			end if
-			
-			set col2 to findColumnStat(updatedCount + 1, 1) as text
-			
-			set col3 to findColumnStat(updatedCount + 1, 2) as text
-			
-			set col4 to findColumnStat(updatedCount + 1, 3) as text
-			
-			set theCount to theCount + 1
-			log "Updating theCount to " & theCount & " "
-			
-			writeFile(keyword & "," & col2 & "," & col3 & "," & col4 & newLine, false) as text
-		end repeat
+		delay defaultDelayValue
 		
-		log "Check to see if the button is disabled."
+		set keyword to keywordTerm(theCount)
 		
-		if findNode(jsNextButtonDisabled) is true then
-			log "Next button is disabled. Exiting repeat loop."
+		if keyword is false then
+			log "keyword is false. exiting the loop."
 			exit repeat
 		end if
 		
+		set col2 to col(updatedCount - 1, 1) as text
+		set col3 to col(updatedCount - 1, 2) as text
+		set col4 to col(updatedCount - 1, 3) as text
+		
+		set theCount to theCount + 1
+		log "Updating theCount to " & theCount & " "
+		
+		writeFile(keyword & "," & col2 & "," & col3 & "," & col4 & newLine, false) as text
+		#writeFile(keyword & newLine, false) as text
+	end repeat
+end getData
+
+-- ========================================
+-- BUTTON INTERACTIONS
+-- ========================================
+
+-- Check for disabled button
+on disabledCheck()
+	if findNode(jsNextButtonDisabled) is true then
+		return false
+	else
+		return true
+	end if
+end disabledCheck
+
+-- Button Interaction Handler
+on clickButton(selector)
+	tell application "Safari"
 		log "Clicking the 'Next' Pagination button..."
-		findNode(jsFindNavButton)
+		set a to do JavaScript "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:" & selector & "')[0].click()" in document 1
 		
 		log "Waiting for the new keywords to load..."
 		delay defaultDelayValue
-	end repeat
-	userPrompt("Finished!")
-end getData
+	end tell
+end clickButton
 
-getData()
+-- Next Button
+on nextButton()
+	clickButton("last-child")
+end nextButton
+
+-- First Button
+on firstButton()
+	clickButton("first-child")
+end firstButton
+
+
+-- ========================================
+-- ROUTINES
+-- ========================================
+
+on mainRoutine()
+	writeHeaders()
+	firstButton()
+	
+	repeat
+		getData()
+		if disabledCheck() is false then
+			exit repeat
+		end if
+		nextButton()
+	end repeat
+	
+	userPrompt("Finished!")
+end mainRoutine
+
+mainRoutine()
+#col(2, 1)
