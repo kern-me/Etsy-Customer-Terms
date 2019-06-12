@@ -6,7 +6,7 @@ set AppleScript's text item delimiters to ","
 property defaultKeyDelay : 0.2
 property defaultDelayValue : 0.75
 
-property rowHeaders : "Search Terms, Etsy, Google \",\" ETC, Total Visits"
+property rowHeaders : "Search Query, Impressions, Position, Visits, Conversion Rate, Revenue, Listings"
 
 property newLine : "\n"
 
@@ -18,78 +18,12 @@ property jsFindNavButtonHome : "document.querySelectorAll('.pagination')[0].quer
 
 property mainURL : "https://www.etsy.com/your/shops/me/stats/traffic?ref=seller-platform-mcnav"
 
--- Log Dividers
-on logIt(content)
-	log "------------------------------------------------"
-	log content
-	log "------------------------------------------------"
-end logIt
-
-
--- ========================================
--- USER PROMPTS
--- ========================================
-
-on userPrompt(theText)
-	logIt("userPrompt()")
-	activate
-	display dialog theText
-end userPrompt
-
-on userPrompt2Buttons(theText, buttonText1, buttonText2)
-	logIt("userPrompt()")
-	activate
-	display dialog theText buttons {buttonText1, buttonText2}
-end userPrompt2Buttons
-
--- Progress Dialog Handler
-on progressDialog(theMessage)
-	set progress description to theMessage
-end progressDialog
-
--- User Range Choice Dialog
-on chooseRange()
-	# URL append options
-	set last30 to "&date_range=last_30"
-	set thisYear to "&date_range=this_year"
-	set allTime to "&date_range=all_time"
-	
-	# Button Displays
-	set a to "Last 30 Days (Recommended)"
-	set b to "This Year"
-	set c to "All Time"
-	
-	# Dialog Window
-	set userDialog to display dialog "Which range do you want to display?" buttons {a, b, c} default button 1
-	
-	# Return the user's choice
-	set userChoice to button returned of userDialog as string
-	
-	if userChoice is a then
-		set theData to last30
-	else if userChoice is b then
-		set theData to thisYear
-	else if userChoice is c then
-		set theData to allTime
-	end if
-	
-	return theData
-end chooseRange
-
--- Set url append
-on setUserRange()
-	set theURL to chooseRange()
-	return theURL as string
-end setUserRange
-
-
 
 -- ========================================
 -- READ AND WRITE
 -- ========================================
 
 on writeTextToFile(theText, theFile, overwriteExistingContent)
-	logIt("writeTextToFile()")
 	try
 		
 		set theFile to theFile as string
@@ -112,158 +46,118 @@ end writeTextToFile
 
 -- Write to file
 on writeFile(theContent, writable)
-	logIt("writeFile()")
 	set this_Story to theContent
 	set theFile to (((path to desktop folder) as string) & "Etsy Searched Terms.csv")
 	writeTextToFile(this_Story, theFile, writable)
 end writeFile
-
--- ========================================
--- BROWSER / URL BEHAVIOR
--- ========================================
-on openURL(a)
-	tell application "Safari"
-		tell window 1
-			set current tab to (make new tab with properties {URL:mainURL & a})
-		end tell
-	end tell
-end openURL
-
-
--- ========================================
--- DOM INTERACTIONS
--- ========================================
-
--- Find keyword term
-on keywordTerm(a)
-	try
-		tell application "Safari"
-			set theKeyword to do JavaScript "document.querySelector('#horizontal-chart3 tr:nth-child(" & a & ") span').innerText" in document 1
-			return theKeyword as text
-		end tell
-	on error
-		return false
-	end try
-end keywordTerm
-
--- Find column data
-on col(a, b)
-	try
-		tell application "Safari"
-			set theData to do JavaScript "document.querySelector('#horizontal-chart3 > tr:nth-child(" & a & ") > td > div > div > div > div:nth-child(" & b & ")').innerText" in document 1
-			return theData as text
-		end tell
-	on error
-		return false
-	end try
-end col
-
--- ========================================
--- USER PROMPTS
--- ========================================
-
--- Pagination Button
-on findNode(theJS)
-	tell application "Safari"
-		do JavaScript "" & theJS & "" in document 1
-	end tell
-end findNode
-
-
--- ========================================
--- WRITE HEADERS
--- ========================================
 
 -- Write Headers
 on writeHeaders()
 	writeFile(rowHeaders & newLine, false) as text
 end writeHeaders
 
+
+-- ========================================
+-- DOM INTERACTIONS
+-- ========================================
+
+on getColumnData(theRow, theColumn)
+	tell application "Safari"
+		set theData to do JavaScript "document.querySelectorAll('table tr:nth-child(" & theRow & ") td')[" & theColumn & "].innerText.trim()" in document 1
+		return theData
+	end tell
+end getColumnData
+
+
+-- ========================================
+-- WRITE HEADERS
+-- ========================================
+
 -- Write the Data
-on getData()
-	set theCount to 2
-	set keyword to ""
+on getRowData(theRow)
+	set theCount to 0
 	
-	repeat
+	repeat 7 times
 		set updatedCount to (theCount + 1)
-		log "updatedCount = " & updatedCount & ""
 		
-		delay defaultDelayValue
+		delay 0.5
 		
-		set keyword to keywordTerm(theCount)
-		
-		if keyword is false then
-			log "keyword is false. exiting the loop."
-			exit repeat
-		end if
-		
-		set col2 to col(updatedCount - 1, 1) as text
-		set col3 to col(updatedCount - 1, 2) as text
-		set col4 to col(updatedCount - 1, 3) as text
-		
+		set rowData to getColumnData(theRow, updatedCount - 1)
 		set theCount to theCount + 1
-		log "Updating theCount to " & theCount & " "
-		
-		writeFile(keyword & "," & col2 & "," & col3 & "," & col4 & newLine, false) as text
+		writeFile(rowData & ",", false) as text
 	end repeat
-end getData
+	
+	writeFile(newLine, false) as text
+end getRowData
 
--- ========================================
--- BUTTON INTERACTIONS
--- ========================================
 
--- Check for disabled button
-on disabledCheck()
-	if findNode(jsNextButtonDisabled) is true then
-		return false
-	else
-		return true
-	end if
-end disabledCheck
+
+# Count number of data rows
+on countRows()
+	tell application "Safari"
+		set a to do JavaScript "document.querySelector('tbody').childElementCount" in document 1
+		delay 1
+		return a
+	end tell
+end countRows
+
 
 -- Button Interaction Handler
+property pageNext : "#root > div > div:nth-child(3) > div > div > div > button:last-child"
+property firstPage : "#root > div > div:nth-child(3) > div > div > div > button:nth-child(2)"
+
+
+
+
+on startPagination()
+	tell application "Safari"
+		set a to do JavaScript "document.querySelector('" & firstPage & "').click()" in document 1
+	end tell
+end startPagination
+
+
+
+
 on clickButton(selector)
 	tell application "Safari"
-		log "Clicking the 'Next' Pagination button..."
-		set a to do JavaScript "document.querySelectorAll('.pagination')[0].querySelectorAll('.btn-group-item:" & selector & "')[0].click()" in document 1
+		set checkDisabled to do JavaScript "document.querySelector('" & selector & "').disabled" in document 1
 		
-		log "Waiting for the new keywords to load..."
-		delay defaultDelayValue
+		if checkDisabled is true then
+			return false
+		end if
+		
+		set a to do JavaScript "document.querySelector('" & selector & "').click()" in document 1
+		delay 1
+		return true
 	end tell
 end clickButton
 
--- Next Button
-on nextButton()
-	clickButton("last-child")
-end nextButton
 
--- First Button
-on firstButton()
-	clickButton("first-child")
-end firstButton
-
+# Main Repeat Loop
+on mainLoop()
+	writeFile(rowHeaders & newLine, false) as text
+	
+	startPagination()
+	
+	delay 0.5
+	
+	repeat
+		set theCount to 0
+		set rowCount to countRows()
+		
+		repeat rowCount times
+			set updatedCount to (theCount + 1)
+			set rowData to getRowData(updatedCount)
+			set theCount to theCount + 1
+		end repeat
+		
+		if clickButton(pageNext) is false then
+			exit repeat
+		end if
+	end repeat
+end mainLoop
 
 -- ========================================
 -- ROUTINES
 -- ========================================
-
-on mainRoutine()
-	set urlAppend to setUserRange()
-	openURL(urlAppend)
-	delay 10
-	writeHeaders()
-	firstButton()
-	
-	repeat
-		getData()
-		if disabledCheck() is false then
-			exit repeat
-		end if
-		nextButton()
-	end repeat
-	
-	userPrompt("Finished!")
-end mainRoutine
-
-mainRoutine()
-
+mainLoop()
